@@ -1,112 +1,183 @@
-#include "Light.hpp"
+#include "WindowMaker.hpp"
 #include "Camera.hpp"
+#include "Light.hpp"
 #include "Models.hpp"
 #include "Shaders.hpp"
-#include "WindowMaker.hpp"
 
-#include <GLFW/glfw3.h>
 #include <glad/glad.h>
+#include <GLFW/glfw3.h>
+
+#include "./external/imgui/backends/imgui_impl_glfw.h"
+#include "./external/imgui/backends/imgui_impl_opengl3.h"
+#include "./external/imgui/imgui.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <iostream>
+
+// --------------------------------------------------
+// Globals
+// --------------------------------------------------
 float lastFrame = 0.0f;
 
-void framebuffer_size_callback(GLFWwindow *, int w, int h) {
-  glViewport(0, 0, w, h);
+// --------------------------------------------------
+// Callbacks
+// --------------------------------------------------
+void framebuffer_size_callback(GLFWwindow*, int w, int h)
+{
+    glViewport(0, 0, w, h);
 }
 
-void drawSuzanne(Shader &shader, Model &model, Light &light, Camera &camera,
-                 const glm::vec3 &position, float time, const glm::mat4 &view,
-                 const glm::mat4 &projection) {
-  shader.use();
+// --------------------------------------------------
+// Draw helper
+// --------------------------------------------------
+void drawSuzanne(
+    Shader& shader,
+    Model& model,
+    Light& light,
+    Camera& camera,
+    const glm::vec3& position,
+    float time,
+    const glm::mat4& view,
+    const glm::mat4& projection)
+{
+    shader.use();
 
-  glm::mat4 modelMat(1.0f);
-  modelMat = glm::translate(modelMat, position);
-  modelMat = glm::scale(modelMat, glm::vec3(0.6f));
-  modelMat = glm::rotate(modelMat, time * 0.6f, glm::vec3(0, 1, 0));
+    glm::mat4 modelMat(1.0f);
+    modelMat = glm::translate(modelMat, position);
+    modelMat = glm::scale(modelMat, glm::vec3(0.6f));
+    modelMat = glm::rotate(modelMat, time * 0.6f, glm::vec3(0.0f, 1.0f, 0.0f));
 
-  shader.setMat4("model", modelMat);
-  shader.setMat4("view", view);
-  shader.setMat4("projection", projection);
+    shader.setMat4("model", modelMat);
+    shader.setMat4("view", view);
+    shader.setMat4("projection", projection);
 
-  shader.setVec3("viewPos", camera.Position);
-  shader.setVec3("albedo", glm::vec3(0.8f, 0.3f, 0.3f));
-  shader.setFloat("shininess", 32.0f);
+    // Common uniforms (ignored if unused)
+    shader.setVec3("viewPos", camera.Position);
+    shader.setVec3("albedo", glm::vec3(0.8f, 0.3f, 0.3f));
+    shader.setFloat("shininess", 32.0f);
 
-  // Only for PBR
+    // PBR-friendly defaults
+    shader.setFloat("roughness", 0.4f);
+    shader.setFloat("metallic", 0.0f);
+    shader.setFloat("ao", 1.0f);
 
-  shader.setFloat("roughness", 0.4f);
-  shader.setFloat("metallic", 0.0f);
-  shader.setFloat("ao", 1.0f);
-
-  light.apply(shader);
-  model.draw();
+    light.apply(shader);
+    model.draw();
 }
 
-// -------------------- MAIN --------------------
-int main() {
-  // ---- Window ----
-  WindowMaker wm(1800, 900);
-  GLFWwindow *window = wm.make_window();
-  glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+// --------------------------------------------------
+// MAIN
+// --------------------------------------------------
+int main()
+{
+    // ---- Window ----
+    WindowMaker wm(1800, 900);
+    GLFWwindow* window = wm.make_window();
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-  glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
 
-  Camera camera(window);
+    // ---- Camera (mouse handled internally) ----
+    Camera camera(window);
 
-  Shader lambert("shaders/basic.vert", "shaders/lambert.frag");
-  Shader phong("shaders/basic.vert", "shaders/phong.frag");
-  Shader blinn("shaders/basic.vert", "shaders/blinn.frag");
-  Shader toon("shaders/basic.vert", "shaders/toon.frag");
-  Shader pbr("shaders/basic.vert", "shaders/pbr.frag");
+    // ---- ImGui init (vendored, normal path) ----
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
 
-  Model suzanne("./suzanne_display/suzanne_display.obj");
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
 
-  Light light(glm::vec3(2.0f, 3.0f, 2.0f), glm::vec3(1.0f),
-              "shaders/light.vert", "shaders/light.frag");
+    // ---- Shaders ----
+    Shader lambert("shaders/basic.vert", "shaders/lambert.frag");
+    Shader phong  ("shaders/basic.vert", "shaders/phong.frag");
+    Shader blinn  ("shaders/basic.vert", "shaders/blinn.frag");
+    Shader toon   ("shaders/basic.vert", "shaders/toon.frag");
+    Shader pbr    ("shaders/basic.vert", "shaders/pbr.frag");
 
-  while (!glfwWindowShouldClose(window)) {
-    float currentFrame = glfwGetTime();
-    float deltaTime = currentFrame - lastFrame;
-    lastFrame = currentFrame;
+    // ---- Model ----
+    Model suzanne("./suzanne_display/suzanne_display.obj");
 
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-      glfwSetWindowShouldClose(window, true);
+    // ---- Light ----
+    Light light(
+        glm::vec3(2.0f, 3.0f, 2.0f),
+        glm::vec3(1.0f),
+        "shaders/light.vert",
+        "shaders/light.frag"
+    );
 
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-      camera.processKeyboard(GLFW_KEY_W, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-      camera.processKeyboard(GLFW_KEY_S, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-      camera.processKeyboard(GLFW_KEY_A, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-      camera.processKeyboard(GLFW_KEY_D, deltaTime);
+    // ---- UI state ----
+    bool rotateModels = true;
 
-    glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // ---- Render loop ----
+    while (!glfwWindowShouldClose(window))
+    {
+        float currentFrame = glfwGetTime();
+        float deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
 
-    glm::mat4 view = camera.getViewMatrix();
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
-                                            1800.0f / 900.0f, 0.1f, 100.0f);
+        // ---- Input ----
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+            glfwSetWindowShouldClose(window, true);
 
-    float t = static_cast<float>(glfwGetTime());
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            camera.processKeyboard(GLFW_KEY_W, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            camera.processKeyboard(GLFW_KEY_S, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            camera.processKeyboard(GLFW_KEY_A, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            camera.processKeyboard(GLFW_KEY_D, deltaTime);
 
-    drawSuzanne(lambert, suzanne, light, camera, {-4.0f, 0.0f, 0.0f}, t, view,
-                projection);
-    drawSuzanne(phong, suzanne, light, camera, {-2.0f, 0.0f, 0.0f}, t, view,
-                projection);
-    drawSuzanne(toon, suzanne, light, camera, {0.0f, 0.0f, 0.0f}, t, view,
-                projection);
-    drawSuzanne(pbr, suzanne, light, camera, {2.0f, 0.0f, 0.0f}, t, view,
-                projection);
+        // ---- Clear ----
+        glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    light.draw(view, projection);
+        // ---- Matrices ----
+        glm::mat4 view = camera.getViewMatrix();
+        glm::mat4 projection = glm::perspective(
+            glm::radians(camera.Zoom),
+            1800.0f / 900.0f,
+            0.1f, 100.0f
+        );
 
-    glfwSwapBuffers(window);
-    glfwPollEvents();
-  }
+        float t = rotateModels ? static_cast<float>(glfwGetTime()) : 0.0f;
 
-  glfwTerminate();
-  return 0;
+        // ---- ImGui frame ----
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::Begin("Reflectance Models");
+        ImGui::Text("Side-by-side comparison");
+        ImGui::Checkbox("Rotate models", &rotateModels);
+        ImGui::End();
+
+        // ---- Draw models ----
+        drawSuzanne(lambert, suzanne, light, camera, {-4.0f, 0.0f, 0.0f}, t, view, projection);
+        drawSuzanne(phong,   suzanne, light, camera, {-2.0f, 0.0f, 0.0f}, t, view, projection);
+        drawSuzanne(blinn,   suzanne, light, camera, { 0.0f, 0.0f, 0.0f}, t, view, projection);
+        drawSuzanne(toon,    suzanne, light, camera, { 2.0f, 0.0f, 0.0f}, t, view, projection);
+        drawSuzanne(pbr,     suzanne, light, camera, { 4.0f, 0.0f, 0.0f}, t, view, projection);
+
+        // ---- Light debug ----
+        light.draw(view, projection);
+
+        // ---- Render ImGui ----
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    // ---- Cleanup ----
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    glfwTerminate();
+    return 0;
 }
