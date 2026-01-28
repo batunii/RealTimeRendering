@@ -78,7 +78,7 @@ int main() {
   glEnable(GL_DEPTH_TEST);
 
   Camera camera(window);
-
+  camera.mouseActive = false;
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
@@ -104,15 +104,18 @@ int main() {
     lastFrame = currentFrame;
     ImGuiIO &io = ImGui::GetIO();
 
-    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS &&
-        !io.WantCaptureMouse) {
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && !io.WantCaptureMouse ) {
       if (!cameraActive) {
         cameraActive = true;
+        camera.mouseActive = cameraActive;
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
       }
     }
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && cameraActive) {
+
+        cameraActive = false;
+        camera.mouseActive = cameraActive;
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
 

@@ -18,6 +18,7 @@ public:
     float MovementSpeed{2.5f};
     float MouseSensitivity{0.1f};
     float Zoom{45.0f};
+    bool mouseActive = false;
 
     Camera(GLFWwindow* window,
            glm::vec3 position = {0.0f, 0.0f, 3.0f})
@@ -51,7 +52,7 @@ private:
     float lastX{400.0f};
     float lastY{300.0f};
 
-    static void mouseCallback(GLFWwindow* window, double xpos, double ypos)
+  static void mouseCallback(GLFWwindow* window, double xpos, double ypos)
     {
         auto* cam = static_cast<Camera*>(glfwGetWindowUserPointer(window));
         if (!cam) return;
@@ -71,28 +72,32 @@ private:
         cam->processMouse(xoffset, yoffset);
     }
 
-    static void scrollCallback(GLFWwindow* window, double, double yoffset)
-    {
+     static void scrollCallback(GLFWwindow *window, double, double yoffset) {
+      
         auto* cam = static_cast<Camera*>(glfwGetWindowUserPointer(window));
         if (!cam) return;
 
         cam->Zoom -= static_cast<float>(yoffset);
         if (cam->Zoom < 1.0f) cam->Zoom = 1.0f;
         if (cam->Zoom > 45.0f) cam->Zoom = 45.0f;
-    }
+      }
 
-    void processMouse(float xoffset, float yoffset)
-    {
+    void processMouse(float xoffset, float yoffset) {
+      if (this->mouseActive) {
+
         xoffset *= MouseSensitivity;
         yoffset *= MouseSensitivity;
 
-        Yaw   += xoffset;
+        Yaw += xoffset;
         Pitch += yoffset;
 
-        if (Pitch > 89.0f)  Pitch = 89.0f;
-        if (Pitch < -89.0f) Pitch = -89.0f;
+        if (Pitch > 89.0f)
+          Pitch = 89.0f;
+        if (Pitch < -89.0f)
+          Pitch = -89.0f;
 
         updateVectors();
+      }
     }
 
     void updateVectors()
