@@ -20,7 +20,6 @@ bool cameraActive = false;
 // ---- UI-controlled properties ----
 glm::vec3 uiLightPos   = glm::vec3(2.0f, 3.0f, 2.0f);
 glm::vec3 uiLightColor = glm::vec3(1.0f);
-float     uiLightIntensity = 1.0f;
 
 glm::vec3 uiAlbedo = glm::vec3(0.8f, 0.3f, 0.3f);
 float uiShininess  = 32.0f;
@@ -32,8 +31,6 @@ float uiAO        = 1.0f;
 
 // Scene
 bool rotateModels = true;
-float rotationSpeed = 0.6f;
-bool showLight = true;
 
 
 void framebuffer_size_callback(GLFWwindow *, int w, int h) {
@@ -148,7 +145,6 @@ int main() {
     ImGui::Text("Light");
     ImGui::DragFloat3("Position", &uiLightPos[0], 0.1f);
     ImGui::ColorEdit3("Color", &uiLightColor[0]);
-    ImGui::SliderFloat("Intensity", &uiLightIntensity, 0.0f, 10.0f);
 
     ImGui::Separator();
 
@@ -165,12 +161,6 @@ int main() {
     ImGui::SliderFloat("AO", &uiAO, 0.0f, 1.0f);
 
     ImGui::Separator();
-
-    // ---- Scene ----
-    ImGui::Checkbox("Rotate models", &rotateModels);
-    ImGui::SliderFloat("Rotation speed", &rotationSpeed, 0.0f, 2.0f);
-    ImGui::Checkbox("Show light", &showLight);
-
     ImGui::End();
 
     // ---- Draw models ----
