@@ -29,6 +29,12 @@ public:
         targetShader.setVec3("lightColor", Color);
     }
 
+    // setters
+    void updatePosCol(glm::vec3 &color, glm::vec3 &position) {
+      this->Color = color;
+      this->Position = position;      
+    }
+
     // Draw debug cube
     void draw(const glm::mat4& view,
               const glm::mat4& projection) const
