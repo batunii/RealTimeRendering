@@ -176,9 +176,6 @@ int main() {
     ImGui::Separator();
     ImGui::End();
 
-    // ---- Draw models ----
-    // drawSuzanne(blinn, suzanne, light, camera, {-4.0f, 0.0f, 0.0f}, t, view,
-                // projection);
      drawSuzanne(lambert, suzanne, light, camera, {-2.0f, 0.0f, 0.0f}, t, view,
                 projection);
     drawSuzanne(phong, suzanne, light, camera, {0.0f, 0.0f, 0.0f}, t, view,
@@ -188,7 +185,6 @@ int main() {
     drawSuzanne(pbr, suzanne, light, camera, {4.0f, 0.0f, 0.0f}, t, view,
                 projection);
 
-    // ---- Light debug ----
    // light.updatePosCol(uiLightColor, uiLightPos);
     light.draw(view, projection);
 
