@@ -23,8 +23,9 @@ glm::vec3 uiLightColor = glm::vec3(1.0f);
 
 glm::vec3 uiAlbedo = glm::vec3(0.8f, 0.3f, 0.3f);
 float uiShininess  = 32.0f;
-
-// PBR
+float uiToonLevels = 4.0f;
+float uiSpecularStrength = 0.5f;
+float uiDiffusionStrength = 1.0f;
 float uiRoughness = 0.4f;
 float uiMetallic  = 0.0f;
 float uiAO        = 1.0f;
@@ -55,6 +56,11 @@ void drawSuzanne(Shader &shader, Model &model, Light &light, Camera &camera,
   shader.setVec3("viewPos", camera.Position);
   shader.setVec3("albedo", glm::vec3(0.8f, 0.3f, 0.3f));
   shader.setFloat("shininess", uiShininess);
+  shader.setFloat("strength", uiSpecularStrength);
+  shader.setFloat("diffusionStrength", uiDiffusionStrength);
+
+  // Toon Shader
+  shader.setFloat("levels", uiToonLevels);
 
   // PBR-friendly defaults
   shader.setFloat("roughness", uiRoughness);
@@ -149,13 +155,20 @@ int main() {
     ImGui::Separator();
 
     // ---- Material ----
-    ImGui::Text("Material");
+    ImGui::Text("Material - Phong");
     ImGui::ColorEdit3("Albedo", &uiAlbedo[0]);
-    ImGui::SliderFloat("Shininess", &uiShininess, 2.0f, 256.0f);
+    ImGui::SliderFloat("Shininess", &uiShininess, 0.0f, 256.0f);
+    ImGui::SliderFloat("SpecularStrength", &uiSpecularStrength, 0.0f, 2.0f);
+    ImGui::SliderFloat("DiffusionStrength", &uiDiffusionStrength, 0.0f, 2.0f);
+
+// Toon Shader    
+
+    ImGui::Text("Toon Shader");
+    ImGui::SliderFloat("ToonLevels", &uiToonLevels, 0.0f, 6.0f);
 
     // ---- PBR ----
     ImGui::Separator();
-    ImGui::Text("PBR");
+    ImGui::Text("PBR - Cook");
     ImGui::SliderFloat("Roughness", &uiRoughness, 0.02f, 1.0f);
     ImGui::SliderFloat("Metallic", &uiMetallic, 0.0f, 1.0f);
     ImGui::SliderFloat("AO", &uiAO, 0.0f, 1.0f);

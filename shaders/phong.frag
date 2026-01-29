@@ -9,6 +9,8 @@ uniform vec3 lightPos;
 uniform vec3 viewPos;
 uniform vec3 lightColor;
 uniform vec3 albedo;
+uniform float strength;
+uniform float diffusionStrength;
 
 uniform float shininess;
 void main()
@@ -19,11 +21,11 @@ void main()
     vec3 V = normalize(viewPos - FragPos);
 
     // Diffuse
-    float diff = max(dot(N, L), 0.0);
+    float diff = diffusionStrength * max(dot(N, L), 0.0);
 
     // Phong specular (reflection vector)
     vec3 R = reflect(-L, N);
-    float spec = pow(max(dot(V, R), 0.0), shininess);
+    float spec = strength * pow(max(dot(V, R), 0.0), shininess);
 
     vec3 color =
         albedo * diff +

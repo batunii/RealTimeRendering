@@ -7,6 +7,7 @@ in vec3 Normal;
 uniform vec3 lightPos;
 uniform vec3 lightColor;
 uniform vec3 albedo;
+uniform float levels;
 
 void main()
 {
@@ -16,7 +17,6 @@ void main()
     float diff = max(dot(N, L), 0.0);
 
     // Quantize lighting into bands
-    float levels = 4.0;
     diff = floor(diff * levels) / levels;
 
     vec3 color = diff * albedo * lightColor;
