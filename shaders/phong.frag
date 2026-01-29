@@ -11,10 +11,10 @@ uniform vec3 lightColor;
 uniform vec3 albedo;
 
 uniform float shininess;
-
 void main()
 {
     vec3 N = normalize(Normal);
+
     vec3 L = normalize(lightPos - FragPos);
     vec3 V = normalize(viewPos - FragPos);
 
@@ -27,7 +27,7 @@ void main()
 
     vec3 color =
         albedo * diff +
-        lightColor * spec;
+            lightColor * spec;
 
     FragColor = vec4(color, 1.0);
 }

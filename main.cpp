@@ -83,7 +83,7 @@ int main() {
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL3_Init("#version 330");
 
-  // Shader lambert("shaders/basic.vert", "shaders/lambert.frag");
+  Shader lambert("shaders/basic.vert", "shaders/lambert.frag");
   // Shader blinn("shaders/basic.vert", "shaders/blinn.frag");
   Shader phong("shaders/basic.vert", "shaders/phong.frag");
   Shader toon("shaders/basic.vert", "shaders/toon.frag");
@@ -164,10 +164,10 @@ int main() {
     ImGui::End();
 
     // ---- Draw models ----
-    // drawSuzanne(lambert, suzanne, light, camera, {-4.0f, 0.0f, 0.0f}, t, view,
+    // drawSuzanne(blinn, suzanne, light, camera, {-4.0f, 0.0f, 0.0f}, t, view,
                 // projection);
-    // drawSuzanne(blinn, suzanne, light, camera, {-2.0f, 0.0f, 0.0f}, t, view,
-                // projection);
+     drawSuzanne(lambert, suzanne, light, camera, {-2.0f, 0.0f, 0.0f}, t, view,
+                projection);
     drawSuzanne(phong, suzanne, light, camera, {0.0f, 0.0f, 0.0f}, t, view,
                 projection);
     drawSuzanne(toon, suzanne, light, camera, {2.0f, 0.0f, 0.0f}, t, view,
