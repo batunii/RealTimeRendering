@@ -3,7 +3,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include <iostream>
 #include <stdexcept>
 
 class WindowMaker {
@@ -27,7 +26,7 @@ public:
 
     // 3. Create window
     GLFWwindow *window =
-        glfwCreateWindow(m_width, m_height, "Practice", nullptr, nullptr);
+        glfwCreateWindow(m_width, m_height, "RTR Assignment 1", nullptr, nullptr);
 
     if (!window) {
       glfwTerminate();

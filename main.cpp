@@ -21,7 +21,7 @@ bool cameraActive = false;
 glm::vec3 uiLightPos   = glm::vec3(2.0f, 3.0f, 2.0f);
 glm::vec3 uiLightColor = glm::vec3(1.0f);
 
-glm::vec3 uiAlbedo = glm::vec3(0.8f, 0.3f, 0.3f);
+glm::vec3 uiAlbedo = glm::vec3(0.1f, 0.5f, 0.1f);
 float uiShininess  = 32.0f;
 float uiToonLevels = 4.0f;
 float uiSpecularStrength = 0.5f;
@@ -45,7 +45,7 @@ void drawSuzanne(Shader &shader, Model &model, Light &light, Camera &camera,
 
   glm::mat4 modelMat(1.0f);
   modelMat = glm::translate(modelMat, position);
-  modelMat = glm::scale(modelMat, glm::vec3(0.6f));
+  modelMat = glm::scale(modelMat, glm::vec3(0.006f));
   modelMat = glm::rotate(modelMat, time * 0.6f, glm::vec3(0.0f, 1.0f, 0.0f));
 
   shader.setMat4("model", modelMat);
@@ -54,7 +54,7 @@ void drawSuzanne(Shader &shader, Model &model, Light &light, Camera &camera,
 
   // Common uniforms (ignored if unused)
   shader.setVec3("viewPos", camera.Position);
-  shader.setVec3("albedo", glm::vec3(0.8f, 0.3f, 0.3f));
+  shader.setVec3("albedo", uiAlbedo);
   shader.setFloat("shininess", uiShininess);
   shader.setFloat("strength", uiSpecularStrength);
   shader.setFloat("diffusionStrength", uiDiffusionStrength);
@@ -95,7 +95,7 @@ int main() {
   Shader toon("shaders/basic.vert", "shaders/toon.frag");
   Shader pbr("shaders/basic.vert", "shaders/pbr.frag");
 
-  Model suzanne("./suzanne_display/suzanne_display.obj");
+  Model suzanne("./teapot.obj");
 
   Light light(uiLightPos, uiLightColor,
               "shaders/light.vert", "shaders/light.frag");
@@ -176,8 +176,8 @@ int main() {
     ImGui::Separator();
     ImGui::End();
 
-     drawSuzanne(lambert, suzanne, light, camera, {-2.0f, 0.0f, 0.0f}, t, view,
-                projection);
+     //drawSuzanne(lambert, suzanne, light, camera, {-2.0f, 0.0f, 0.0f}, t, view,
+     //           projection);
     drawSuzanne(phong, suzanne, light, camera, {0.0f, 0.0f, 0.0f}, t, view,
                 projection);
     drawSuzanne(toon, suzanne, light, camera, {2.0f, 0.0f, 0.0f}, t, view,
@@ -191,7 +191,7 @@ int main() {
     // ---- Render ImGui ----
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
+    
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
