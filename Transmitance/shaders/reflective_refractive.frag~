@@ -1,0 +1,128 @@
+#version 330 core
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 ViewDir;
+
+uniform sampler2D envMap;
+uniform float ior;
+uniform float chromaticDispersion;
+uniform float reflectivity;
+
+vec2 directionToUV(vec3 dir)
+{
+    // Negate the direction for correct environment mapping
+    dir = -dir;
+    
+    vec3 absDir = abs(dir);
+    vec2 uv;
+    float faceIndex;
+    
+    if (absDir.x >= absDir.y && absDir.x >= absDir.z) {
+        if (dir.x > 0.0) {
+            uv = vec2(-dir.z, -dir.y) / absDir.x;
+            faceIndex = 0.0;
+        } else {
+            uv = vec2(dir.z, -dir.y) / absDir.x;
+            faceIndex = 1.0;
+        }
+    } else if (absDir.y >= absDir.x && absDir.y >= absDir.z) {
+        if (dir.y > 0.0) {
+            uv = vec2(dir.x, dir.z) / absDir.y;
+            faceIndex = 2.0;
+        } else {
+            uv = vec2(dir.x, -dir.z) / absDir.y;
+            faceIndex = 3.0;
+        }
+    } else {
+        if (dir.z > 0.0) {
+            uv = vec2(dir.x, -dir.y) / absDir.z;
+            faceIndex = 4.0;
+        } else {
+            uv = vec2(-dir.x, -dir.y) / absDir.z;
+            faceIndex = 5.0;
+        }
+    }
+    
+    uv = uv * 0.5 + 0.5;
+    
+    vec2 faceUV;
+    if (faceIndex == 0.0) {
+        faceUV = vec2(2.0, 1.0);
+    } else if (faceIndex == 1.0) {
+        faceUV = vec2(0.0, 1.0);
+    } else if (faceIndex == 2.0) {
+        faceUV = vec2(1.0, 0.0);
+    } else if (faceIndex == 3.0) {
+        faceUV = vec2(1.0, 2.0);
+    } else if (faceIndex == 4.0) {
+        faceUV = vec2(1.0, 1.0);
+    } else {
+        faceUV = vec2(3.0, 1.0);
+    }
+    
+    vec2 finalUV = (faceUV + uv) / vec2(4.0, 3.0);
+    return finalUV;
+}
+
+float fresnelSchlick(float cosTheta, float F0)
+{
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+void main()
+{
+    vec3 N = normalize(Normal);
+    vec3 V = normalize(ViewDir);
+    
+    // Special case: IOR close to 1.0 means minimal refraction
+    if (abs(ior - 1.0) < 0.01) {
+        vec2 straightUV = directionToUV(V);
+        vec3 throughColor = texture(envMap, straightUV).rgb;
+        FragColor = vec4(throughColor, 0.1);
+        return;
+    }
+    
+    // Calculate Fresnel
+    float F0 = pow((1.0 - ior) / (1.0 + ior), 2.0);
+    float cosTheta = abs(dot(N, V));
+    float fresnel = fresnelSchlick(cosTheta, F0);
+    
+    // REFLECTION
+    vec3 reflectDir = reflect(V, N);
+    vec2 reflectUV = directionToUV(reflectDir);
+    vec3 reflectColor = texture(envMap, reflectUV).rgb;
+    
+    // REFRACTION with CHROMATIC DISPERSION
+    float etaR = 1.0 / max(ior - chromaticDispersion, 1.001);
+    float etaG = 1.0 / max(ior, 1.001);
+    float etaB = 1.0 / max(ior + chromaticDispersion, 1.001);
+    
+    vec3 refractDirR = refract(V, N, etaR);
+    vec3 refractDirG = refract(V, N, etaG);
+    vec3 refractDirB = refract(V, N, etaB);
+    
+    // Handle total internal reflection
+    if (length(refractDirR) == 0.0) refractDirR = reflectDir;
+    if (length(refractDirG) == 0.0) refractDirG = reflectDir;
+    if (length(refractDirB) == 0.0) refractDirB = reflectDir;
+    
+    vec2 refractUV_R = directionToUV(refractDirR);
+    vec2 refractUV_G = directionToUV(refractDirG);
+    vec2 refractUV_B = directionToUV(refractDirB);
+    
+    float refractR = texture(envMap, refractUV_R).r;
+    float refractG = texture(envMap, refractUV_G).g;
+    float refractB = texture(envMap, refractUV_B).b;
+    
+    vec3 refractColor = vec3(refractR, refractG, refractB);
+    
+    // Combine reflection and refraction using Fresnel
+    vec3 finalColor = mix(refractColor, reflectColor, fresnel * reflectivity);
+    
+    // Optional: Add opacity based on IOR for better transparency
+    float opacity = clamp((ior - 1.0) / 1.5, 0.1, 1.0);
+    
+    FragColor = vec4(finalColor, opacity);
+}

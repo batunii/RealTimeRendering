@@ -1,0 +1,80 @@
+#include "Light.hpp"
+#include "Camera.hpp"
+#include "Models.hpp"
+#include "Shaders.hpp"
+#include "WindowMaker.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+float lastFrame = 0.0f;
+
+int main() {
+  WindowMaker wm(1024, 1024);
+  GLFWwindow *window = wm.make_window();
+
+  glEnable(GL_DEPTH_TEST);
+
+  Camera camera(window);
+
+  Shader objectShader("shaders/basic.vert", "shaders/basic.frag");
+  Shader lightShader("shaders/light.vert", "shaders/light.frag");
+
+  Model suzanne("./suzanne_display/suzanne_display.obj");
+
+  Light light(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(1.0f),
+              "shaders/light.vert", "shaders/light.frag");
+
+  while (!glfwWindowShouldClose(window)) {
+    float currentFrame = glfwGetTime();
+    float deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
+
+    // ---- Keyboard input (movement only) ----
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+      glfwSetWindowShouldClose(window, true);
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+      camera.processKeyboard(GLFW_KEY_W, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+      camera.processKeyboard(GLFW_KEY_S, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+      camera.processKeyboard(GLFW_KEY_A, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+      camera.processKeyboard(GLFW_KEY_D, deltaTime);
+
+    glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glm::mat4 view = camera.getViewMatrix();
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
+                                            800.0f / 600.0f, 0.1f, 100.0f);
+
+    objectShader.use();
+
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::rotate(model, static_cast<float>(glfwGetTime()) * 0.4f,
+                        glm::vec3(0.0f, 1.0f, 0.0f));
+
+    objectShader.setMat4("model", model);
+    objectShader.setMat4("view", view);
+    objectShader.setMat4("projection", projection);
+
+    // Solid color for now
+    objectShader.setVec3("albedo", glm::vec3(0.8f, 0.8f, 0.8f));
+
+    // Send light info to object shader
+    light.apply(objectShader);
+    objectShader.setVec3("albedo", glm::vec3(0.8f, 0.2f, 0.2f));
+    suzanne.draw();
+
+    // ---- Draw light cube (debug) ----
+    light.draw(view, projection);
+
+    // ---- Swap ----
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+  }
+
+  glfwTerminate();
+  return 0;
+}

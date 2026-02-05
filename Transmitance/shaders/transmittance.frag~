@@ -1,0 +1,54 @@
+#version 330 core
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec2 TexCoords;
+in vec3 ViewDir;
+
+// Light properties
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+
+// Material properties
+uniform vec3 albedo;
+uniform float transmittance;  // 0.0 = opaque, 1.0 = fully transmissive
+uniform float thickness;      // Material thickness
+uniform vec3 transmittanceColor;  // Color tint for transmitted light
+
+// Fresnel effect for view-dependent transmittance
+float fresnelSchlick(float cosTheta, float F0)
+{
+    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+void main()
+{
+    vec3 N = normalize(Normal);
+    vec3 V = normalize(ViewDir);
+    vec3 L = normalize(lightPos - FragPos);
+    
+    // Front-facing lighting (standard diffuse)
+    float NdotL = max(dot(N, L), 0.0);
+    vec3 frontLight = lightColor * albedo * NdotL;
+    
+    // Back-facing transmittance (light passing through)
+    // Simulate light coming from behind the surface
+    float backNdotL = max(dot(-N, L), 0.0);
+    
+    // Attenuate by thickness and distance
+    float attenuation = exp(-thickness * (1.0 - backNdotL));
+    
+    // Transmitted light with color tint
+    vec3 transmittedLight = lightColor * transmittanceColor * backNdotL * attenuation * transmittance;
+    
+    // Fresnel - more transmittance at grazing angles
+    float fresnel = fresnelSchlick(abs(dot(N, V)), 0.04);
+    
+    // Combine front and back lighting
+    vec3 finalColor = frontLight + transmittedLight * (1.0 - fresnel);
+    
+    // Output with transparency based on transmittance
+    float alpha = mix(1.0, 0.5 + transmittance * 0.5, transmittance);
+    FragColor = vec4(finalColor, alpha);
+}

@@ -1,0 +1,114 @@
+[
+  {
+    "file": "glad.c",
+    "arguments": [
+      "clang++",
+      "glad.c",
+      "-Iexternal/imgui",
+      "-Iexternal/imgui/backends",
+      "-g",
+      "-o",
+      "main"
+    ],
+    "directory": "/home/batunii/Documents/Code/Transmitance",
+    "output": "main"
+  },
+  {
+    "file": "main.cpp",
+    "arguments": [
+      "clang++",
+      "main.cpp",
+      "-Iexternal/imgui",
+      "-Iexternal/imgui/backends",
+      "-g",
+      "-o",
+      "main"
+    ],
+    "directory": "/home/batunii/Documents/Code/Transmitance",
+    "output": "main"
+  },
+  {
+    "file": "external/imgui/imgui.cpp",
+    "arguments": [
+      "clang++",
+      "external/imgui/imgui.cpp",
+      "-Iexternal/imgui",
+      "-Iexternal/imgui/backends",
+      "-g",
+      "-o",
+      "main"
+    ],
+    "directory": "/home/batunii/Documents/Code/Transmitance",
+    "output": "main"
+  },
+  {
+    "file": "external/imgui/imgui_draw.cpp",
+    "arguments": [
+      "clang++",
+      "external/imgui/imgui_draw.cpp",
+      "-Iexternal/imgui",
+      "-Iexternal/imgui/backends",
+      "-g",
+      "-o",
+      "main"
+    ],
+    "directory": "/home/batunii/Documents/Code/Transmitance",
+    "output": "main"
+  },
+  {
+    "file": "external/imgui/imgui_widgets.cpp",
+    "arguments": [
+      "clang++",
+      "external/imgui/imgui_widgets.cpp",
+      "-Iexternal/imgui",
+      "-Iexternal/imgui/backends",
+      "-g",
+      "-o",
+      "main"
+    ],
+    "directory": "/home/batunii/Documents/Code/Transmitance",
+    "output": "main"
+  },
+  {
+    "file": "external/imgui/imgui_tables.cpp",
+    "arguments": [
+      "clang++",
+      "external/imgui/imgui_tables.cpp",
+      "-Iexternal/imgui",
+      "-Iexternal/imgui/backends",
+      "-g",
+      "-o",
+      "main"
+    ],
+    "directory": "/home/batunii/Documents/Code/Transmitance",
+    "output": "main"
+  },
+  {
+    "file": "external/imgui/backends/imgui_impl_glfw.cpp",
+    "arguments": [
+      "clang++",
+      "external/imgui/backends/imgui_impl_glfw.cpp",
+      "-Iexternal/imgui",
+      "-Iexternal/imgui/backends",
+      "-g",
+      "-o",
+      "main"
+    ],
+    "directory": "/home/batunii/Documents/Code/Transmitance",
+    "output": "main"
+  },
+  {
+    "file": "external/imgui/backends/imgui_impl_opengl3.cpp",
+    "arguments": [
+      "clang++",
+      "external/imgui/backends/imgui_impl_opengl3.cpp",
+      "-Iexternal/imgui",
+      "-Iexternal/imgui/backends",
+      "-g",
+      "-o",
+      "main"
+    ],
+    "directory": "/home/batunii/Documents/Code/Transmitance",
+    "output": "main"
+  }
+]

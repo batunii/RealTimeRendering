@@ -1,0 +1,229 @@
+#include "Light.hpp"
+#include "Camera.hpp"
+#include "Models.hpp"
+#include "Shaders.hpp"
+#include "WindowMaker.hpp"
+#include "Texture.hpp"
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include "./external/imgui/imgui.h"
+#include "./external/imgui/backends/imgui_impl_glfw.h"
+#include "./external/imgui/backends/imgui_impl_opengl3.h"
+#include <glm/gtc/matrix_transform.hpp>
+#include <iostream>
+
+float lastFrame = 0.0f;
+bool cameraActive = false;
+int renderMode = 2;  
+
+// Material properties
+float uiIOR = 1.5f;                     // Index of refraction
+float uiChromaticDispersion = 0.015f;   // Chromatic aberration
+float uiReflectivity = 1.0f;            // Reflection strength
+bool rotateModels = true;
+
+// Scene properties
+glm::vec3 uiLightPos = glm::vec3(3.0f, 3.0f, 3.0f);
+glm::vec3 uiLightColor = glm::vec3(1.0f);
+
+void framebuffer_size_callback(GLFWwindow *, int w, int h) {
+    glViewport(0, 0, w, h);
+}
+
+void drawGlassObject(Shader &shader, Model &model, Camera &camera,
+                     const glm::vec3 &position, float time, const glm::mat4 &view,
+                     const glm::mat4 &projection, Texture &envTexture, 
+                     float scale = 0.6f, float rotSpeed = 0.6f) {
+    shader.use();
+    
+    glm::mat4 modelMat(1.0f);
+    modelMat = glm::translate(modelMat, position);
+    modelMat = glm::scale(modelMat, glm::vec3(scale));
+    if (rotateModels) {
+        modelMat = glm::rotate(modelMat, time * rotSpeed, glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+    
+    shader.setMat4("model", modelMat);
+    shader.setMat4("view", view);
+    shader.setMat4("projection", projection);
+    shader.setVec3("viewPos", camera.Position);
+    
+    // Material properties
+    shader.setFloat("ior", uiIOR);
+    shader.setFloat("chromaticDispersion", uiChromaticDispersion);
+    shader.setFloat("reflectivity", uiReflectivity);
+    shader.setInt("renderMode", renderMode);  // Add this line
+    shader.setInt("envMap", 0);
+    
+    envTexture.bind(0);
+    model.draw();
+}
+
+void drawSkybox(Shader &shader, Model &model, const glm::mat4 &view, 
+                const glm::mat4 &projection) {
+    glDepthFunc(GL_LEQUAL);
+    
+    shader.use();
+    shader.setInt("skyboxTexture", 0);
+    
+    glm::mat4 modelMat = glm::mat4(1.0f);
+    modelMat = glm::scale(modelMat, glm::vec3(100.0f));
+    glm::mat4 skyboxView = glm::mat4(glm::mat3(view));
+    
+    shader.setMat4("model", modelMat);
+    shader.setMat4("view", skyboxView);
+    shader.setMat4("projection", projection);
+    
+    model.draw();
+    
+    glDepthFunc(GL_LESS);
+}
+
+int main() {
+    WindowMaker wm(1800, 900);
+    GLFWwindow *window = wm.make_window();
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    
+    glEnable(GL_DEPTH_TEST);
+
+    Camera camera(window);
+    camera.mouseActive = false;
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+
+    // Load shaders
+    Shader glassShader("shaders/reflective_refractive.vert", 
+                       "shaders/reflective_refractive.frag");
+    Shader skyboxShader("./shaders/skybox.vert", "./shaders/skybox.frag");
+    
+    // Load models
+    Model skybox("./skybox_rajaampat/skybox_rajaampat.obj");
+    Model suzanne("./suzanne_display/suzanne_display.obj");
+    Model teapot("./teapot_new.obj");
+    Model ball("./crystal_ball.obj");
+    Model donut("./source/Torus.obj");    
+    
+    // Load environment texture
+    Texture envTexture("./skybox_rajaampat/emissiveMap1.png", false);
+    std::cout<<"This is for obj : "<<envTexture.ID<<std::endl;
+    Light light(uiLightPos, uiLightColor, "shaders/light.vert", "shaders/light.frag");
+
+
+    while (!glfwWindowShouldClose(window)) {
+        float currentFrame = glfwGetTime();
+        float deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        ImGuiIO &io = ImGui::GetIO();
+
+        // Camera controls
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && 
+            !io.WantCaptureMouse) {
+            if (!cameraActive) {
+                cameraActive = true;
+                camera.mouseActive = cameraActive;
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            }
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && cameraActive) {
+            cameraActive = false;
+            camera.mouseActive = cameraActive;
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            camera.processKeyboard(GLFW_KEY_W, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            camera.processKeyboard(GLFW_KEY_S, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            camera.processKeyboard(GLFW_KEY_A, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            camera.processKeyboard(GLFW_KEY_D, deltaTime);
+
+        glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glm::mat4 view = camera.getViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
+                                                1800.0f / 900.0f, 0.1f, 100.0f);
+
+        float t = static_cast<float>(glfwGetTime());
+
+        // ImGui UI
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::Begin("Glass Material Properties");
+        ImGui::Text("Reflection & Refraction Demo");
+        ImGui::Separator();
+
+        ImGui::Text("Render Mode");
+        ImGui::RadioButton("Pure Refraction", &renderMode, 0);
+        ImGui::RadioButton("Pure Reflection", &renderMode, 1);
+        ImGui::RadioButton("Fresnel (Reflection + Refraction)", &renderMode, 2);
+
+        ImGui::Separator();
+        ImGui::Text("Physical Properties");
+        ImGui::SliderFloat("Index of Refraction", &uiIOR, 1.0f, 2.5f);
+        ImGui::SliderFloat("Chromatic Dispersion", &uiChromaticDispersion, 0.0f,
+                           0.05f);
+        ImGui::SliderFloat("Reflectivity", &uiReflectivity, 0.0f, 1.0f);
+
+        ImGui::Separator();
+        ImGui::Text("Scene Controls");
+        ImGui::Checkbox("Rotate Objects", &rotateModels);
+        ImGui::DragFloat3("Light Position", &uiLightPos[0], 0.1f);
+
+        ImGui::Separator();
+        ImGui::Text("Camera Info");
+        ImGui::Text("Position: (%.1f, %.1f, %.1f)", camera.Position.x,
+                    camera.Position.y, camera.Position.z);
+        ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+
+        ImGui::End();
+
+        // Render scene
+        // 1. Draw skybox first
+        drawSkybox(skyboxShader, skybox, view, projection);
+
+        // 2. Draw multiple glass objects at different positions
+        drawGlassObject(glassShader, suzanne, camera, 
+                       glm::vec3(0.0f, 0.0f, 0.0f), t, view, projection, 
+                       envTexture, 0.6f, 0.6f);
+        
+        drawGlassObject(glassShader, teapot, camera, 
+                       glm::vec3(-2.5f, 0.5f, -1.0f), t * 0.8f, view, projection, 
+                       envTexture, 1.0f, 0.4f);
+        
+        drawGlassObject(glassShader, ball, camera, 
+                       glm::vec3(2.5f, -0.3f, -1.5f), t * 1.2f, view, projection, 
+                       envTexture, 10.0f, -0.5f);
+
+        drawGlassObject(glassShader, donut, camera, 
+                       glm::vec3(4.5f, 0.5f, -2.5f), t * 1.4f, view, projection, 
+                       envTexture, 1.0f, -0.5f);
+        // 3. Draw light indicator
+        //light.draw(view, projection);
+
+        // Render ImGui
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    // Cleanup
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+    glfwTerminate();
+    return 0;
+}

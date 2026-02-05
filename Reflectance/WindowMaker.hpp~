@@ -1,0 +1,32 @@
+#include <GL/gl.h>
+#include <GLFW/glfw3.h>
+#include <iostream>
+#include <stdexcept>
+
+class WindowMaker {
+public:
+  const unsigned int m_height;
+  const unsigned int m_width;
+  WindowMaker(unsigned int height, unsigned int width)
+      : m_height(height), m_width(width) {}
+  GLFWwindow *make_window() {
+
+    if (!glfwInit()) {
+      std::cout << "Failed to load GLFW\n";
+      throw std::runtime_error("Error in loading GLFW");
+    }
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    GLFWwindow *window =
+        glfwCreateWindow(this->m_width, this->m_height, "Practice", NULL, NULL);
+    if (window == NULL) {
+      std::cout << "Error in Window creation\n";
+      throw std::runtime_error("Error in making Windoiw");
+    }
+    glfwMakeContextCurrent(window);
+    return window;
+  }
+};

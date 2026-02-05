@@ -1,0 +1,6 @@
+file := glad.c Practice.cpp
+headers := *hpp
+shaders := vertex.glsl fragment.glsl
+
+main: $(file) $(shaders) $(headers)
+	clang++ $(file) -lglfw -lGL -lassimp -g -o main
