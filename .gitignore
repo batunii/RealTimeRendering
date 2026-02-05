@@ -1,2 +1,6 @@
-.cache
+**/cache
 *~
+*.obj
+*.png
+*.jpg
+*.mtl
