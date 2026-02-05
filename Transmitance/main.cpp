@@ -47,12 +47,16 @@ void drawGlassObject(Shader &shader, Model &model, Camera &camera,
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);
     shader.setVec3("viewPos", camera.Position);
-    
+
+    if (renderMode == 0) {
+      uiReflectivity = 0;
+    } else if (renderMode == 1) {
+      uiReflectivity = 1;
+    }
     // Material properties
     shader.setFloat("ior", uiIOR);
     shader.setFloat("chromaticDispersion", uiChromaticDispersion);
     shader.setFloat("reflectivity", uiReflectivity);
-    shader.setInt("renderMode", renderMode);  // Add this line
     shader.setInt("envMap", 0);
     
     envTexture.bind(0);
