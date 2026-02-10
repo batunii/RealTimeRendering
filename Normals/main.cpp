@@ -9,6 +9,7 @@
 #include "Texture.hpp"
 #include "WindowMaker.hpp"
 #include <GLFW/glfw3.h>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/trigonometric.hpp>
@@ -23,7 +24,9 @@ glm::vec3 uiLightCol = glm::vec3(1.0f);
 float uiAmbientStrength = 0.2f;
 float uiSpecularStrength = 1.0f;
 float uiShininess = 128.0f;
+float uiBumpStrength = 1.0f;
 bool useNormalMapping = true;
+bool uiRotate = true;
 
 void framebuffer_size_callback(GLFWwindow *, int w, int h) {
   glViewport(0, 0, w, h);
@@ -35,9 +38,10 @@ void drawObject(Shader &shader, Model &model, Camera &camera,
   shader.use();
   glm::mat4 modelMat(1.0f);
   modelMat = glm::translate(modelMat, position);
-  
+
   // Apply rotations (in degrees) - order: X, Y, Z
-  modelMat = glm::rotate(modelMat, time, glm::vec3(0.0f, 1.0f, 0.0f));
+  if (uiRotate)  
+    modelMat = glm::rotate(modelMat, time/2, glm::vec3(0.0f, 1.0f, 0.0f));
   
   modelMat = glm::scale(modelMat, glm::vec3(scale));
   
@@ -50,6 +54,7 @@ void drawObject(Shader &shader, Model &model, Camera &camera,
   shader.setFloat("ambientStrength", uiAmbientStrength);
   shader.setFloat("specularStrength", uiSpecularStrength);
   shader.setFloat("shininess", uiShininess);
+  shader.setFloat("bumpStrength", uiBumpStrength);
   shader.setBool("useNormalMap", useNormalMapping);
   
   model.draw(shader.ID);
@@ -87,11 +92,13 @@ int main() {
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL3_Init("#version 330");
 
-  Shader boxShader("./shaders/basic.vert", "./shaders/basic.frag");
+  Shader boxShader("./shaders/basic.vert", "./shaders/basic_albedo.frag");
+  Shader suzzaneShader("./shaders/basic.vert", "./shaders/basic.frag");
   Shader skyboxShader("./shaders/skybox.vert", "./shaders/skybox.frag");
 
   std::cout << "Loading models..." << std::endl;
-  Model box("./Ring/engraved_ring.obj");
+  Model suzzane("./suzzane/test_low.obj");  
+  Model box("./ImageToStl.com_r_normal_cube/r_normal_cube.obj");  
 
   Light light(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(1.0f),
               "./shaders/light.vert", "./shaders/light.frag");
@@ -150,16 +157,21 @@ int main() {
     ImGui::SliderFloat("Ambient Strength", &uiAmbientStrength, 0.0f, 1.0f);
     ImGui::SliderFloat("Specular Strength", &uiSpecularStrength, 0.0f, 2.0f);
     ImGui::SliderFloat("Shininess", &uiShininess, 1.0f, 256.0f);
+    ImGui::SliderFloat("Bumpiness", &uiBumpStrength,  0.0f, 2.0f);
     
     ImGui::Separator();
     ImGui::Checkbox("Enable Normal Mapping", &useNormalMapping);
+    ImGui::Checkbox("Rotate", &uiRotate);
     
     ImGui::End();
 
     light.updatePosCol(uiLightCol, uiLightPos);
     light.draw(view, projection);
-    
-    drawObject(boxShader, box, camera, glm::vec3(0.0f), view, projection, 0.05f, currentFrame);
+
+    drawObject(suzzaneShader, suzzane, camera, glm::vec3(-2.5f, 0.0f, 0.0f), view, projection,
+                1, currentFrame);
+    drawObject(boxShader, box, camera, glm::vec3(2.5f, 0, 0), view, projection,
+               1.0f, currentFrame);
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

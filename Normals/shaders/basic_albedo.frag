@@ -25,7 +25,8 @@ out vec4 FragColor;
 
 void main() {
     // Sample diffuse texture
-    vec3 albedo = texture(texture_diffuse1, TexCoords).rgb;
+    // vec3 albedo = texture(texture_diffuse1, TexCoords).rgb;
+  vec3 albedo = vec3(1.0f); 
     // Choose between normal map or geometry normal
     vec3 normal;
     if (useNormalMap) {
