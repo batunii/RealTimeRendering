@@ -1,0 +1,176 @@
+#include "Light.hpp"
+#include <glad/glad.h>
+#include "./external/imgui/backends/imgui_impl_glfw.h"
+#include "./external/imgui/backends/imgui_impl_opengl3.h"
+#include "./external/imgui/imgui.h"
+#include "Camera.hpp"
+#include "Models.hpp"
+#include "Shaders.hpp"
+#include "Texture.hpp"
+#include "WindowMaker.hpp"
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/trigonometric.hpp>
+#include <iostream>
+
+float lastFrame = 0.0f;
+bool cameraActive = false;
+glm::vec3 uiLightPos = glm::vec3(2.0f, 2.0f, 2.0f);
+glm::vec3 uiLightCol = glm::vec3(1.0f);
+
+// Material properties
+float uiAmbientStrength = 0.2f;
+float uiSpecularStrength = 1.0f;
+float uiShininess = 128.0f;
+bool useNormalMapping = true;
+
+void framebuffer_size_callback(GLFWwindow *, int w, int h) {
+  glViewport(0, 0, w, h);
+}
+
+void drawObject(Shader &shader, Model &model, Camera &camera,
+                const glm::vec3 &position, const glm::mat4 &view,
+                const glm::mat4 &projection, float scale = 1.0f, const float time = 0 ) {
+  shader.use();
+  glm::mat4 modelMat(1.0f);
+  modelMat = glm::translate(modelMat, position);
+  
+  // Apply rotations (in degrees) - order: X, Y, Z
+  modelMat = glm::rotate(modelMat, time, glm::vec3(0.0f, 1.0f, 0.0f));
+  
+  modelMat = glm::scale(modelMat, glm::vec3(scale));
+  
+  shader.setMat4("model", modelMat);
+  shader.setMat4("view", view);
+  shader.setMat4("projection", projection);
+  shader.setVec3("viewPos", camera.Position);
+  shader.setVec3("lightPos", uiLightPos);
+  shader.setVec3("lightColor", uiLightCol);
+  shader.setFloat("ambientStrength", uiAmbientStrength);
+  shader.setFloat("specularStrength", uiSpecularStrength);
+  shader.setFloat("shininess", uiShininess);
+  shader.setBool("useNormalMap", useNormalMapping);
+  
+  model.draw(shader.ID);
+}
+
+void drawSkybox(Shader &shader, Model &model, const glm::mat4 &view,
+                const glm::mat4 &projection, Texture &skyboxTexture) {
+  glDepthFunc(GL_LEQUAL);
+  shader.use();
+  skyboxTexture.bind(0);
+  shader.setInt("skyboxTexture", 0);
+  glm::mat4 modelMat = glm::mat4(1.0f);
+  modelMat = glm::scale(modelMat, glm::vec3(100.0f));
+  glm::mat4 skyboxView = glm::mat4(glm::mat3(view));
+  shader.setMat4("model", modelMat);
+  shader.setMat4("view", skyboxView);
+  shader.setMat4("projection", projection);
+  model.draw(shader.ID);
+  glDepthFunc(GL_LESS);
+}
+
+int main() {
+  WindowMaker wm(1800, 900);
+  GLFWwindow *window = wm.make_window();
+  glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+  glEnable(GL_DEPTH_TEST);
+
+  Camera camera(window);
+  camera.mouseActive = false;
+
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGui::StyleColorsDark();
+  ImGui_ImplGlfw_InitForOpenGL(window, true);
+  ImGui_ImplOpenGL3_Init("#version 330");
+
+  Shader boxShader("./shaders/basic.vert", "./shaders/basic.frag");
+  Shader skyboxShader("./shaders/skybox.vert", "./shaders/skybox.frag");
+
+  std::cout << "Loading models..." << std::endl;
+  Model box("./Ring/engraved_ring.obj");
+
+  Light light(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(1.0f),
+              "./shaders/light.vert", "./shaders/light.frag");
+
+  while (!glfwWindowShouldClose(window)) {
+    float currentFrame = glfwGetTime();
+    float deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
+
+    ImGuiIO &io = ImGui::GetIO();
+
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS &&
+        !io.WantCaptureMouse) {
+      if (!cameraActive) {
+        cameraActive = true;
+        camera.mouseActive = cameraActive;
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+      }
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && cameraActive) {
+      cameraActive = false;
+      camera.mouseActive = cameraActive;
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+      camera.processKeyboard(GLFW_KEY_W, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+      camera.processKeyboard(GLFW_KEY_S, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+      camera.processKeyboard(GLFW_KEY_A, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+      camera.processKeyboard(GLFW_KEY_D, deltaTime);
+
+    glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glm::mat4 view = camera.getViewMatrix();
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
+                                           1800.0f / 900.0f, 0.1f, 100.0f);
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::Begin("RTR Assignment 3 - Normals", nullptr,
+                 ImGuiWindowFlags_AlwaysAutoResize);
+    
+    ImGui::Text("Light Settings");
+    ImGui::SliderFloat3("Light Position", &uiLightPos[0], -15.0, 15.0);
+    ImGui::ColorEdit3("Light Color", &uiLightCol[0]);
+    
+    ImGui::Separator();
+    ImGui::Text("Material Settings");
+    ImGui::SliderFloat("Ambient Strength", &uiAmbientStrength, 0.0f, 1.0f);
+    ImGui::SliderFloat("Specular Strength", &uiSpecularStrength, 0.0f, 2.0f);
+    ImGui::SliderFloat("Shininess", &uiShininess, 1.0f, 256.0f);
+    
+    ImGui::Separator();
+    ImGui::Checkbox("Enable Normal Mapping", &useNormalMapping);
+    
+    ImGui::End();
+
+    light.updatePosCol(uiLightCol, uiLightPos);
+    light.draw(view, projection);
+    
+    drawObject(boxShader, box, camera, glm::vec3(0.0f), view, projection, 0.05f, currentFrame);
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+  }
+
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
+  glfwTerminate();
+  return 0;
+}
