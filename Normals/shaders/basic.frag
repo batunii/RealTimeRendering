@@ -52,7 +52,6 @@ void main() {
     vec3 halfwayDir = normalize(lightDir + viewDir);
     float spec = pow(max(dot(normal, halfwayDir), 0.0), shininess);
     vec3 specular = specularStrength * spec * lightColor;
-    
     // Combine lighting with albedo
     vec3 result = (ambient + diffuse + specular) * albedo;
     

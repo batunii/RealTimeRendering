@@ -19,7 +19,6 @@ void main()
 
     vec3 L = normalize(lightPos - FragPos);
     vec3 V = normalize(viewPos - FragPos);
-
     // Diffuse
     float diff = diffusionStrength * max(dot(N, L), 0.0);
 

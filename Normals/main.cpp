@@ -1,4 +1,5 @@
 #include "Light.hpp"
+#include <array>
 #include <glad/glad.h>
 #include "./external/imgui/backends/imgui_impl_glfw.h"
 #include "./external/imgui/backends/imgui_impl_opengl3.h"
@@ -8,17 +9,22 @@
 #include "Shaders.hpp"
 #include "Texture.hpp"
 #include "WindowMaker.hpp"
+#include "imgui_internal.h"
 #include <GLFW/glfw3.h>
+#include <glm/ext/scalar_constants.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/trigonometric.hpp>
 #include <iostream>
+#include <string>
 
 float lastFrame = 0.0f;
 bool cameraActive = false;
 glm::vec3 uiLightPos = glm::vec3(2.0f, 2.0f, 2.0f);
 glm::vec3 uiLightCol = glm::vec3(1.0f);
+const std::array<const char *, 2> uiShaderList = {"Blinn-Phong", "Toon"};
+int uiSelectedShader = 0;
 
 // Material properties
 float uiAmbientStrength = 0.2f;
@@ -34,11 +40,12 @@ void framebuffer_size_callback(GLFWwindow *, int w, int h) {
 
 void drawObject(Shader &shader, Model &model, Camera &camera,
                 const glm::vec3 &position, const glm::mat4 &view,
-                const glm::mat4 &projection, float scale = 1.0f, const float time = 0 ) {
+                const glm::mat4 &projection, float scale = 1.0f, const float time = 0, const bool rotate = false ) {
   shader.use();
   glm::mat4 modelMat(1.0f);
   modelMat = glm::translate(modelMat, position);
 
+  modelMat = rotate ? glm::rotate(modelMat, float(glm::radians(90.0f)), glm::vec3(1.0f, 0.0f, 0.0f))  : modelMat;
   // Apply rotations (in degrees) - order: X, Y, Z
   if (uiRotate)  
     modelMat = glm::rotate(modelMat, time/2, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -94,10 +101,12 @@ int main() {
 
   Shader boxShader("./shaders/basic.vert", "./shaders/basic_albedo.frag");
   Shader suzzaneShader("./shaders/basic.vert", "./shaders/basic.frag");
+  Shader suzzaneShaderToon("./shaders/basic.vert", "./shaders/toon.frag");
   Shader skyboxShader("./shaders/skybox.vert", "./shaders/skybox.frag");
 
   std::cout << "Loading models..." << std::endl;
   Model suzzane("./suzzane/test_low.obj");  
+  Model manhole("./manhole/normal_map_test_-_manhole.obj");  
   Model box("./ImageToStl.com_r_normal_cube/r_normal_cube.obj");  
 
   Light light(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(1.0f),
@@ -157,7 +166,8 @@ int main() {
     ImGui::SliderFloat("Ambient Strength", &uiAmbientStrength, 0.0f, 1.0f);
     ImGui::SliderFloat("Specular Strength", &uiSpecularStrength, 0.0f, 2.0f);
     ImGui::SliderFloat("Shininess", &uiShininess, 1.0f, 256.0f);
-    ImGui::SliderFloat("Bumpiness", &uiBumpStrength,  0.0f, 2.0f);
+    ImGui::SliderFloat("Bumpiness", &uiBumpStrength, 0.0f, 2.0f);
+    ImGui::ListBox("Shaders", &uiSelectedShader, &uiShaderList[0], 2);    
     
     ImGui::Separator();
     ImGui::Checkbox("Enable Normal Mapping", &useNormalMapping);
@@ -168,10 +178,18 @@ int main() {
     light.updatePosCol(uiLightCol, uiLightPos);
     light.draw(view, projection);
 
-    drawObject(suzzaneShader, suzzane, camera, glm::vec3(-2.5f, 0.0f, 0.0f), view, projection,
-                1, currentFrame);
+    if (uiSelectedShader == 0)
+      drawObject(suzzaneShader, suzzane, camera, glm::vec3(-2.5f, 0.0f, 0.0f),
+                 view, projection, 1, currentFrame);
+    else
+      drawObject(suzzaneShaderToon, suzzane, camera,
+                 glm::vec3(-2.5f, 0.0f, 0.0f), view, projection, 1,
+                 currentFrame);
     drawObject(boxShader, box, camera, glm::vec3(2.5f, 0, 0), view, projection,
                1.0f, currentFrame);
+    drawObject(boxShader, manhole, camera, glm::vec3(7.5f, 0.0f, 0.0f),
+               view, projection, 1.0f,0, true);
+    
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
