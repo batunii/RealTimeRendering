@@ -24,37 +24,28 @@ in vec3 WorldNormal;
 out vec4 FragColor;
 
 void main() {
-    // Sample diffuse texture
-    // vec3 albedo = texture(texture_diffuse1, TexCoords).rgb;
   vec3 albedo = vec3(1.0f); 
-    // Choose between normal map or geometry normal
     vec3 normal;
     if (useNormalMap) {
-        // Sample and decode normal map
         vec3 normalMap = texture(texture_normal1, TexCoords).rgb;
         normalMap = normalize(normalMap * 2.0 - 1.0);
 	normalMap.xy *= bumpStrength;
         normal = normalize(TBN * normalMap);
     } else {
-        // Use geometry normal only
         normal = normalize(WorldNormal);
     }
     
-    // Ambient lighting
     vec3 ambient = ambientStrength * lightColor;
     
-    // Diffuse lighting
     vec3 lightDir = normalize(lightPos - FragPos);
     float diff = max(dot(normal, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
     
-    // Specular lighting (Blinn-Phong)
     vec3 viewDir = normalize(viewPos - FragPos);
     vec3 halfwayDir = normalize(lightDir + viewDir);
     float spec = pow(max(dot(normal, halfwayDir), 0.0), shininess);
     vec3 specular = specularStrength * spec * lightColor;
     
-    // Combine lighting with albedo
     vec3 result = (ambient + diffuse + specular) * albedo;
     
     FragColor = vec4(result, 1.0);

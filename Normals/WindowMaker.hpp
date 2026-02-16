@@ -14,7 +14,7 @@ public:
   WindowMaker(unsigned int height, unsigned int width)
       : m_height(height), m_width(width) {}
 
-  GLFWwindow *make_window() {
+  GLFWwindow *make_window(const char* title= "Practice") {
     // 1. Init GLFW
     if (!glfwInit()) {
       throw std::runtime_error("Failed to initialize GLFW");
@@ -27,7 +27,7 @@ public:
 
     // 3. Create window
     GLFWwindow *window =
-        glfwCreateWindow(m_width, m_height, "Practice", nullptr, nullptr);
+        glfwCreateWindow(m_width, m_height, title, nullptr, nullptr);
 
     if (!window) {
       glfwTerminate();

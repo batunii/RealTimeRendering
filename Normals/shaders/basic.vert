@@ -19,14 +19,12 @@ void main() {
     FragPos = vec3(model * vec4(aPos, 1.0));
     TexCoords = aTexCoords;
     
-    // Transform normal to world space (for non-normal-mapped fallback)
     WorldNormal = mat3(transpose(inverse(model))) * aNormal;
     
-    // Calculate TBN matrix for normal mapping
-    vec3 T = normalize(vec3(model * vec4(aTangent, 0.0)));
-    vec3 B = normalize(vec3(model * vec4(aBitangent, 0.0)));
-    vec3 N = normalize(vec3(model * vec4(aNormal, 0.0)));
-    TBN = mat3(T, B, N);
+    vec3 tangent = normalize(vec3(model * vec4(aTangent, 0.0)));
+    vec3 biTanget = normalize(vec3(model * vec4(aBitangent, 0.0)));
+    vec3 normals = normalize(vec3(model * vec4(aNormal, 0.0)));
+    TBN = mat3(tangent, biTanget, normals);
     
     gl_Position = projection * view * model * vec4(aPos, 1.0);
 }

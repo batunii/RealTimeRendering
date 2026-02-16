@@ -85,7 +85,7 @@ void drawSkybox(Shader &shader, Model &model, const glm::mat4 &view,
 
 int main() {
   WindowMaker wm(1800, 900);
-  GLFWwindow *window = wm.make_window();
+  GLFWwindow *window = wm.make_window("RTR - Normal Maps");
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
   glEnable(GL_DEPTH_TEST);
