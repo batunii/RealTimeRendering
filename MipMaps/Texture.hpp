@@ -47,15 +47,15 @@ public:
     glActiveTexture(GL_TEXTURE0 + unit);
     glBindTexture(GL_TEXTURE_2D, ID);
   }
- void change_mipmap(GLuint min, GLuint mag, uint unit = 0) const {
+  void change_mipmap(GLuint min, GLuint mag, float lod = 1,
+                     uint unit = 0) const {
     bind(unit);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag);
-    if (min == GL_LINEAR_MIPMAP_LINEAR ||
-        min == GL_NEAREST_MIPMAP_LINEAR ||
-        min == GL_NEAREST_MIPMAP_NEAREST ||
-        min == GL_LINEAR_MIPMAP_NEAREST) {
-        glGenerateMipmap(GL_TEXTURE_2D);
+    if (min == GL_LINEAR_MIPMAP_LINEAR || min == GL_NEAREST_MIPMAP_LINEAR ||
+        min == GL_NEAREST_MIPMAP_NEAREST || min == GL_LINEAR_MIPMAP_NEAREST) {
+      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, lod);
+      glGenerateMipmap(GL_TEXTURE_2D);
     }
-}
+  }
 };

@@ -28,8 +28,9 @@ const std::array<const char *, 6> mipmap_min_list = {"LINEAR_MIPMAP_LINEAR",
 int selectedMinConfig = 0;
 const std::array<const char *, 2> mipmap_mag_list = {"LINEAR", "NEAREST"};
 int selectedMagConfig = 0;
-bool checkered_texture_active;
-bool pattern_texture_active;
+bool checkered_texture_active = true;
+bool pattern_texture_active = false;
+float load_bias = 1.0f;
 GLFWwindow *gWindow = nullptr;
 Camera *gCamera = nullptr;
 GLuint min;
@@ -121,6 +122,9 @@ int main() {
     ImGui::Text("Choose Textures");
     ImGui::Checkbox("Checkered Pattern", &checkered_texture_active);
     ImGui::Checkbox("Swirl Pattern", &pattern_texture_active);
+    ImGui::Separator();
+    ImGui::Text("Level of Details");
+    ImGui::SliderFloat("Change Lod Bias", &load_bias, -1.0f, 2.0f);
     ImGui::End();
     glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
     if (fbHeight == 0)
@@ -165,12 +169,13 @@ int main() {
       break;
     }
     if (checkered_texture_active) {
-      checkeredTexture.change_mipmap(min, mag);
+      checkeredTexture.change_mipmap(min, mag, load_bias);
       checkeredTexture.bind();
     } else if (pattern_texture_active) {
-      swirlTexture.change_mipmap(min, mag);
+      swirlTexture.change_mipmap(min, mag, load_bias);
       swirlTexture.bind();
     }
+    std::cout<<"Load Bias :"<<load_bias<<std::endl;    
     checkeredShader.use();
     checkeredShader.setMat4("model", modelMat);
     checkeredShader.setMat4("view", view);
