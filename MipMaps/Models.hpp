@@ -1,6 +1,7 @@
 
 #include "Texture.hpp"
 #include <assimp/Importer.hpp>
+#include <assimp/material.h>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 #include <cstddef>
@@ -99,17 +100,17 @@ public:
   std::vector<MeshClass> m_meshes;
   std::vector<TextureClass *> m_loadedTextures;
   std::string m_directory;
-  ModelClass(const std::string &path) {load(path);}
+  ModelClass(const std::string &path) { load(path); }
   ~ModelClass() {
     for (auto *texture : m_loadedTextures) {
       delete texture;
     }
   }
   void drawModel(uint shaderID) {
-    for (const auto &mesh : m_meshes){
-      std::cout << "Mesh rendering" << std::endl;      
+    for (const auto &mesh : m_meshes) {
+      std::cout << "Mesh rendering" << std::endl;
       mesh.draw_meshes(shaderID);
-}
+    }
   }
 
 private:
@@ -131,6 +132,7 @@ private:
 
     for (unsigned int i = 0; i < ai_scene->mNumMaterials; i++) {
       aiMaterial *material = ai_scene->mMaterials[i];
+
       std::cout << "\nMaterial " << i << ":" << std::endl;
       std::cout << "  Diffuse textures: "
                 << material->GetTextureCount(aiTextureType_DIFFUSE)
@@ -183,13 +185,11 @@ private:
       vertices.push_back(v);
     }
 
-    // Process indices
     for (unsigned int i = 0; i < mesh_node->mNumFaces; i++) {
       for (unsigned int j = 0; j < mesh_node->mFaces[i].mNumIndices; j++)
         indices.push_back(mesh_node->mFaces[i].mIndices[j]);
     }
 
-    // Load material textures
     if (mesh_node->mMaterialIndex >= 0) {
       aiMaterial *material = scene->mMaterials[mesh_node->mMaterialIndex];
 

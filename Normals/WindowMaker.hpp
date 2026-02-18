@@ -1,9 +1,6 @@
 #pragma once
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
-#include <iostream>
 #include <stdexcept>
 
 class WindowMaker {
@@ -15,12 +12,10 @@ public:
       : m_height(height), m_width(width) {}
 
   GLFWwindow *make_window(const char* title= "Practice") {
-    // 1. Init GLFW
     if (!glfwInit()) {
       throw std::runtime_error("Failed to initialize GLFW");
     }
 
-    // 2. OpenGL version hints
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);

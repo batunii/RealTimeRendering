@@ -174,7 +174,6 @@ int main() {
     ImGui::Checkbox("Rotate", &uiRotate);
     
     ImGui::End();
-
     light.updatePosCol(uiLightCol, uiLightPos);
     light.draw(view, projection);
 
