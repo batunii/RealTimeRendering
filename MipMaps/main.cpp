@@ -19,6 +19,8 @@
 
 float lastFrame = 0.0f;
 bool cameraActive = false;
+float rotate = 0.0f;
+float tiles = 1.0f;
 const std::array<const char *, 6> mipmap_min_list = {"LINEAR_MIPMAP_LINEAR",
                                                      "NEAREST_MIPMAP_LINEAR",
                                                      "LINEAR_MIPMAP_NEAREST",
@@ -125,6 +127,11 @@ int main() {
     ImGui::Separator();
     ImGui::Text("Level of Details");
     ImGui::SliderFloat("Change Lod Bias", &load_bias, -1.0f, 2.0f);
+    ImGui::Separator();
+    ImGui::Text("Tiles");
+    ImGui::SliderFloat("Change number of tiles", &tiles, 0.0f, 10.0f);
+    ImGui::Separator();
+    ImGui::SliderFloat("Rotate mode", &rotate, 0.0f, 5.0f);
     ImGui::End();
     glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
     if (fbHeight == 0)
@@ -177,9 +184,11 @@ int main() {
     }
     std::cout<<"Load Bias :"<<load_bias<<std::endl;    
     checkeredShader.use();
+    modelMat = glm::rotate(modelMat, glm::radians(currentFrame)*rotate, glm::vec3(0.0f, 1.0f, 0.0f)); 
     checkeredShader.setMat4("model", modelMat);
     checkeredShader.setMat4("view", view);
     checkeredShader.setMat4("projection", projection);
+    checkeredShader.setFloat("tiles", tiles);    
     checkered.drawModel(checkeredShader.ID);
 
     ImGui::Render();

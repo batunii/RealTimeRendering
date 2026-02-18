@@ -7,9 +7,9 @@ out vec2 vTexCoord;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
-
+uniform float tiles;
 void main()
 {
-    vTexCoord = aTexCoord;
+    vTexCoord = aTexCoord*tiles;
     gl_Position = projection * view * model * vec4(aPos, 1.0);
 }
