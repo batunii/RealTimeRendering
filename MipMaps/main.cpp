@@ -1,17 +1,17 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <array>
-
+// Using IMgu ifor UI
 #include "../external/imgui/backends/imgui_impl_glfw.h"
 #include "../external/imgui/backends/imgui_impl_opengl3.h"
 #include "../external/imgui/imgui.h"
-
+//Header files
 #include "Camera.hpp"
 #include "Models.hpp"
 #include "Shaders.hpp"
 #include "Texture.hpp"
 #include "WindowMaker.hpp"
-
+// GLM for matrix maths
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/fwd.hpp>
