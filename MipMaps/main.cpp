@@ -71,6 +71,7 @@ int main() {
 
   ModelClass checkered(
       "./checkered-tile-floor/source/Floor-Sketchfab/Floor.obj");
+  ModelClass suzzane("./suzzane/test_low.obj");  
   Shader checkeredShader("./basic.vert", "./basic.frag");
   TextureClass checkeredTexture(
       "./checkered-tile-floor/textures/floor-diffuse-texture.png");
@@ -188,9 +189,11 @@ int main() {
     checkeredShader.setMat4("model", modelMat);
     checkeredShader.setMat4("view", view);
     checkeredShader.setMat4("projection", projection);
-    checkeredShader.setFloat("tiles", tiles);    
+    checkeredShader.setFloat("tiles", tiles);
     checkered.drawModel(checkeredShader.ID);
-
+    modelMat = glm::translate(modelMat, glm::vec3(0.0f, 3.0f, 0.0f));
+    checkeredShader.setMat4("model", modelMat);    
+    suzzane.drawModel(checkeredShader.ID, false);    
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     glfwSwapBuffers(window);

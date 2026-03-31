@@ -32,12 +32,13 @@ public:
     setup();
   }
 
-  void draw_meshes(uint shaderID) const {
+  void draw_meshes(uint shaderID, bool useTexture = true) const {
     uint diffuseNr = 1;
     uint specularNr = 1;
     uint normalNr = 1;
     std::cout << "Drawing mesh with " << m_textures.size() << " textrues"
               << std::endl;
+    if(useTexture) {    
     for (size_t i = 0; i < m_textures.size(); i++) {
       glActiveTexture(GL_TEXTURE0 + i);
       std::string number;
@@ -51,7 +52,7 @@ public:
                 << " (ID : " << m_textures[i]->ID << " ) " << std::endl;
       glUniform1i(glGetUniformLocation(shaderID, uniformName.c_str()), i);
       glBindTexture(GL_TEXTURE_2D, m_textures[i]->ID);
-    }
+    }}
 
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
@@ -106,10 +107,10 @@ public:
       delete texture;
     }
   }
-  void drawModel(uint shaderID) {
+  void drawModel(uint shaderID, bool useTexture = true) {
     for (const auto &mesh : m_meshes) {
       std::cout << "Mesh rendering" << std::endl;
-      mesh.draw_meshes(shaderID);
+      mesh.draw_meshes(shaderID, useTexture);
     }
   }
 
