@@ -50,8 +50,8 @@ public:
                : name == "texture_emissive"   ? std::to_string(emmisiveNr++)
                                             : 0;
       std::string uniformName = name + number;
-      std::cout << "Binding " << uniformName << " to texture unit " << i
-                << " (ID : " << m_textures[i]->ID << " ) " << std::endl;
+      // std::cout << "Binding " << uniformName << " to texture unit " << i
+      //           << " (ID : " << m_textures[i]->ID << " ) " << std::endl;
       glUniform1i(glGetUniformLocation(shaderID, uniformName.c_str()), i);
       glBindTexture(GL_TEXTURE_2D, m_textures[i]->ID);
     }}
