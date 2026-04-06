@@ -1,5 +1,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glm/ext/matrix_transform.hpp>
 #include <iostream>
 #include <cmath>
 
@@ -19,46 +20,53 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 
-// -------------------------------------------------------
-// Globals
-// -------------------------------------------------------
-float lastFrame   = 0.0f;
-bool cameraActive = false;
+float lastFrame    = 0.0f;
+bool  cameraActive = false;
 GLFWwindow* gWindow = nullptr;
 Camera*     gCamera = nullptr;
 
-// Scene FBO (with depth) — Pass A renders here
-GLuint sceneFBO = 0, sceneTex = 0;
-GLuint sceneRBO = 0;
+// G-buffer FBO: MRT color + normals + depth texture
+GLuint sceneFBO  = 0;
+GLuint sceneTex  = 0;
+GLuint normalTex = 0;
+GLuint depthTex  = 0;
 
-// Feedback FBOs (no depth) — used for ping-pong passes
+// Feedback FBOs
 GLuint pingPongFBO[2] = {0, 0};
 GLuint pingPongTex[2] = {0, 0};
 
 GLuint quadVAO = 0, quadVBO = 0;
 
+int g_model = 0;
 // Style params
-float g_lambda       = 0.03f;
-int   g_numIters     = 6;
-float g_angle        = 0.0f;
-float g_quantSteps   = 8.0f;
-float g_quantStrength= 0.0f;
-float g_edgeStrength = 1.0f;
-float g_lumaStrength = 1.0f;
-int   g_stylePreset  = 0;  // 0 = Normal (passthrough)
-bool g_flipuvs = false;
-// -------------------------------------------------------
-// Fullscreen quad
-// -------------------------------------------------------
+float g_lambda        = 0.03f;
+int   g_numIters      = 6;
+float g_angle         = 0.0f;
+float g_quantSteps    = 8.0f;
+float g_quantStrength = 0.0f;
+float g_edgeStrength  = 1.0f;
+float g_lumaStrength  = 1.0f;
+int   g_stylePreset   = 0;
+
+// Depth smudging
+bool  g_useDepth      = false;
+float g_depthStrength = 1.0f;
+int   g_depthMode     = 1;
+
+// Normal-driven strokes
+bool  g_useNormals     = false;
+float g_normalStrength = 1.0f;
+int   g_normalMode     = 1;
+
 void renderQuad() {
     if (quadVAO == 0) {
         float quadVerts[] = {
-            -1.0f,  1.0f,  0.0f, 1.0f,
-            -1.0f, -1.0f,  0.0f, 0.0f,
-             1.0f, -1.0f,  1.0f, 0.0f,
-            -1.0f,  1.0f,  0.0f, 1.0f,
-             1.0f, -1.0f,  1.0f, 0.0f,
-             1.0f,  1.0f,  1.0f, 1.0f
+            -1.0f,  1.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, 0.0f, 0.0f,
+             1.0f, -1.0f, 1.0f, 0.0f,
+            -1.0f,  1.0f, 0.0f, 1.0f,
+             1.0f, -1.0f, 1.0f, 0.0f,
+             1.0f,  1.0f, 1.0f, 1.0f
         };
         glGenVertexArrays(1, &quadVAO);
         glGenBuffers(1, &quadVBO);
@@ -82,25 +90,23 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, w, h);
 }
 
-// -------------------------------------------------------
-// FBO setup — scene FBO with depth, feedback FBOs without
-// -------------------------------------------------------
 void setupFBOs(int width, int height) {
-    // --- Cleanup ---
     if (sceneFBO) {
         glDeleteFramebuffers(1, &sceneFBO);
         glDeleteTextures(1, &sceneTex);
-        glDeleteRenderbuffers(1, &sceneRBO);
+        glDeleteTextures(1, &normalTex);
+        glDeleteTextures(1, &depthTex);
     }
     if (pingPongFBO[0]) {
         glDeleteFramebuffers(2, pingPongFBO);
         glDeleteTextures(2, pingPongTex);
     }
 
-    // --- Scene FBO: RGB16F color + depth renderbuffer ---
+    // --- Scene G-buffer FBO ---
     glGenFramebuffers(1, &sceneFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
 
+    // Attachment 0: emissive color
     glGenTextures(1, &sceneTex);
     glBindTexture(GL_TEXTURE_2D, sceneTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
@@ -110,20 +116,36 @@ void setupFBOs(int width, int height) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneTex, 0);
 
-    glGenRenderbuffers(1, &sceneRBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, sceneRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, sceneRBO);
+    // Attachment 1: view-space normals
+    glGenTextures(1, &normalTex);
+    glBindTexture(GL_TEXTURE_2D, normalTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normalTex, 0);
+
+    // Depth as texture
+    glGenTextures(1, &depthTex);
+    glBindTexture(GL_TEXTURE_2D, depthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
+
+    GLenum drawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, drawBuffers);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         std::cerr << "sceneFBO incomplete!\n";
 
-    // --- Feedback FBOs: RGB16F color only, NO depth (saves bandwidth) ---
+    // --- Feedback FBOs ---
     for (int i = 0; i < 2; i++) {
         glGenFramebuffers(1, &pingPongFBO[i]);
         glBindFramebuffer(GL_FRAMEBUFFER, pingPongFBO[i]);
-
         glGenTextures(1, &pingPongTex[i]);
         glBindTexture(GL_TEXTURE_2D, pingPongTex[i]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
@@ -132,7 +154,8 @@ void setupFBOs(int width, int height) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingPongTex[i], 0);
-
+        GLenum buf = GL_COLOR_ATTACHMENT0;
+        glDrawBuffers(1, &buf);
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
             std::cerr << "pingPongFBO[" << i << "] incomplete!\n";
     }
@@ -140,63 +163,44 @@ void setupFBOs(int width, int height) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-// -------------------------------------------------------
-// Preset loader — preset 0 = Normal (no feedback)
-// -------------------------------------------------------
 void applyPreset(int preset) {
+    g_useDepth   = false;
+    g_useNormals = false;
     switch (preset) {
-        case 0: // Normal — pure passthrough, no painting
-            g_lambda        = 0.0f;
-            g_numIters      = 1;
-            g_angle         = 0.0f;
-            g_quantSteps    = 16.0f;
-            g_quantStrength = 0.0f;
-            g_edgeStrength  = 0.0f;
-            g_lumaStrength  = 0.0f;
-            break;
-        case 1: // Base Paper
-            g_lambda        = 0.03f;
-            g_numIters      = 6;
-            g_angle         = 0.0f;
-            g_quantSteps    = 8.0f;
-            g_quantStrength = 0.0f;
-            g_edgeStrength  = 1.0f;
-            g_lumaStrength  = 1.0f;
-            break;
+        case 0:
+            g_lambda=0.0f; g_numIters=1; g_angle=0.0f;
+            g_quantSteps=16.0f; g_quantStrength=0.0f;
+            g_edgeStrength=0.0f; g_lumaStrength=0.0f; break;
+        case 1:
+            g_lambda=0.03f; g_numIters=6; g_angle=0.0f;
+            g_quantSteps=8.0f; g_quantStrength=0.0f;
+            g_edgeStrength=1.0f; g_lumaStrength=1.0f; break;
         case 2: // Van Gogh
-            g_lambda        = 0.05f;
-            g_numIters      = 6;
-            g_angle         = 135.0f;
-            g_quantSteps    = 12.0f;
-            g_quantStrength = 0.1f;
-            g_edgeStrength  = 1.2f;
-            g_lumaStrength  = 1.4f;
-            break;
+            g_lambda=0.05f; g_numIters=6; g_angle=135.0f;
+            g_quantSteps=12.0f; g_quantStrength=0.1f;
+            g_edgeStrength=1.2f; g_lumaStrength=1.4f; break;
         case 3: // Watercolour
-            g_lambda        = 0.025f;
-            g_numIters      = 5;
-            g_angle         = 90.0f;
-            g_quantSteps    = 6.0f;
-            g_quantStrength = 0.25f;
-            g_edgeStrength  = 0.6f;
-            g_lumaStrength  = 1.8f;
-            break;
+            g_lambda=0.025f; g_numIters=5; g_angle=90.0f;
+            g_quantSteps=6.0f; g_quantStrength=0.25f;
+            g_edgeStrength=0.6f; g_lumaStrength=1.8f; break;
         case 4: // Cubist
-            g_lambda        = 0.04f;
-            g_numIters      = 7;
-            g_angle         = 45.0f;
-            g_quantSteps    = 4.0f;
-            g_quantStrength = 0.55f;
-            g_edgeStrength  = 1.5f;
-            g_lumaStrength  = 0.8f;
-            break;
+            g_lambda=0.04f; g_numIters=7; g_angle=45.0f;
+            g_quantSteps=4.0f; g_quantStrength=0.55f;
+            g_edgeStrength=1.5f; g_lumaStrength=0.8f; break;
+        case 5: // Depth Painting
+            g_lambda=0.04f; g_numIters=6; g_angle=0.0f;
+            g_quantSteps=8.0f; g_quantStrength=0.0f;
+            g_edgeStrength=1.0f; g_lumaStrength=1.0f;
+            g_useDepth=true; g_depthStrength=1.5f; g_depthMode=1; break;
+        case 6: // Normal Strokes
+            g_lambda=0.035f; g_numIters=5; g_angle=90.0f;
+            g_quantSteps=8.0f; g_quantStrength=0.0f;
+            g_edgeStrength=1.0f; g_lumaStrength=1.0f;
+            g_useNormals=true; g_normalStrength=1.2f; g_normalMode=1; break;
         default: break;
     }
 }
 
-// -------------------------------------------------------
-// Main
-// -------------------------------------------------------
 int main() {
     WindowMaker wm(1080, 1920);
     GLFWwindow* window = wm.make_window("RTR - Recursive Camera Painting NPR");
@@ -222,41 +226,36 @@ int main() {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    // ModelClass suzzane("./suzzane/test_low.obj");
-    // ModelClass church("./old_church_modeling_-_interior_scene/old_church_modeling_-_interior_scene.obj");
+    ModelClass suzzane("./suzzane/test_low.obj");
+    ModelClass church("./old_church_modeling_-_interior_scene/old_church_modeling_-_interior_scene.obj");
     ModelClass city("./building_pack/model.obj");
 
-    Shader object_shader("./basic.vert",    "./basic.frag");
+    Shader scene_shader("./basic.vert",     "./basic.frag");
     Shader feedbackShader("./feedback.vert","./feedback.frag");
 
-    const char* styles[] = {
-        "Normal (no effect)",
-        "Base Paper",
-        "Van Gogh",
-        "Watercolour",
-        "Cubist"
-    };
+    const char *models[] = {"church", "city", "suzzane"}; 
+        const char *styles[] = {
+        "Normal (no effect)", "Base Paper", "Van Gogh",
+        "Watercolour",        "Cubist",     "Depth Painting",
+        "Normal Strokes"};    
+    const char* depthModes[]  = { "Near smears", "Far smears", "Mid-focus sharp" };
+    const char* normalModes[] = { "Normals only", "Color + Normal blend", "Auto toggle" };
 
-    // -------------------------------------------------------
-    // Render loop
-    // -------------------------------------------------------
     while (!glfwWindowShouldClose(window)) {
         float currentFrame = static_cast<float>(glfwGetTime());
         float deltaTime    = currentFrame - lastFrame;
         lastFrame          = currentFrame;
 
         ImGuiIO& io = ImGui::GetIO();
-
-        // --- Input ---
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && !io.WantCaptureMouse) {
             if (!cameraActive) {
-                cameraActive       = true;
+                cameraActive = true;
                 camera.mouseActive = true;
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             }
         }
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && cameraActive) {
-            cameraActive       = false;
+            cameraActive = false;
             camera.mouseActive = false;
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
@@ -265,7 +264,6 @@ int main() {
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) camera.processKeyboard(GLFW_KEY_A, deltaTime);
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) camera.processKeyboard(GLFW_KEY_D, deltaTime);
 
-        // --- Resize check ---
         int newW, newH;
         glfwGetFramebufferSize(window, &newW, &newH);
         if (newW != fbWidth || newH != fbHeight) {
@@ -275,86 +273,112 @@ int main() {
             setupFBOs(fbWidth, fbHeight);
         }
 
-        // --- ImGui ---
+        // ImGui
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Begin("Recursive Camera Painting NPR", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-	ImGui::Checkbox("FlipUVs", &g_flipuvs);
+        ImGui::Begin("Recursive Camera Painting NPR", nullptr,
+                     ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::Combo("Model Select", &g_model, models, IM_ARRAYSIZE(models));        
         if (ImGui::Combo("Style Preset", &g_stylePreset, styles, IM_ARRAYSIZE(styles)))
             applyPreset(g_stylePreset);
 
         ImGui::Separator();
-        // Hide painting controls when in Normal mode
         if (g_stylePreset != 0) {
             ImGui::SliderFloat("Lambda",         &g_lambda,        0.001f, 0.15f);
-            ImGui::SliderInt("Iterations",       &g_numIters,      1,      10);
+            ImGui::SliderInt  ("Iterations",     &g_numIters,      1,      10);
             ImGui::SliderFloat("Angle",          &g_angle,         0.0f,   360.0f);
             ImGui::SliderFloat("Edge Strength",  &g_edgeStrength,  0.0f,   3.0f);
             ImGui::SliderFloat("Luma Strength",  &g_lumaStrength,  0.0f,   3.0f);
             ImGui::SliderFloat("Quant Steps",    &g_quantSteps,    2.0f,   16.0f);
             ImGui::SliderFloat("Quant Strength", &g_quantStrength, 0.0f,   1.0f);
+
+            ImGui::Separator();
+            ImGui::Text("--- Depth Smudging ---");
+            ImGui::Checkbox("Enable Depth Smudging", &g_useDepth);
+            if (g_useDepth) {
+                ImGui::Combo("Depth Mode",     &g_depthMode,     depthModes,  IM_ARRAYSIZE(depthModes));
+                ImGui::SliderFloat("Depth Strength", &g_depthStrength, 0.0f, 3.0f);
+            }
+
+            ImGui::Separator();
+            ImGui::Text("--- Normal Strokes ---");
+            ImGui::Checkbox("Enable Normal Strokes", &g_useNormals);
+            if (g_useNormals) {
+                ImGui::Combo("Normal Mode",     &g_normalMode,     normalModes, IM_ARRAYSIZE(normalModes));
+                ImGui::SliderFloat("Normal Strength", &g_normalStrength, 0.0f, 3.0f);
+            }
         } else {
-            ImGui::TextDisabled("No painting parameters in Normal mode.");
+            ImGui::TextDisabled("No parameters in Normal mode.");
         }
+
         ImGui::Separator();
         ImGui::Text("LMB: activate camera | ESC: release");
-        ImGui::Text("WASD to move");
         ImGui::End();
 
-        // --- Matrices ---
-        float aspect = static_cast<float>(fbWidth) / static_cast<float>(fbHeight);
+        // Matrices
+        float aspect         = static_cast<float>(fbWidth) / static_cast<float>(fbHeight);
         glm::mat4 view       = camera.getViewMatrix();
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), aspect, 0.1f, 10000.0f);
         glm::mat4 modelMat   = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 1.0f));
+        glm::mat4 normalMat  = glm::transpose(glm::inverse(view * modelMat));
 
-        // ===================================================
-        // Pass A: Render scene into sceneFBO (has depth)
-        // ===================================================
+        // ===========================================
+        // Pass A: G-buffer render (MRT)
+        //   attachment 0 -> sceneTex  (color)
+        //   attachment 1 -> normalTex (view normals)
+        //   depth        -> depthTex
+        // ===========================================
         glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
         glViewport(0, 0, fbWidth, fbHeight);
         glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
 
-        object_shader.use();
-        object_shader.setMat4("projection", projection);
-        object_shader.setMat4("view",       view);
-        object_shader.setMat4("model",      modelMat);
-	object_shader.setBool("flipuvs", g_flipuvs); 
-        // suzzane.drawModel(object_shader.ID);
-        // church.drawModel(object_shader.ID);
-        city.drawModel(object_shader.ID);
+        scene_shader.use();
+        scene_shader.setMat4("projection", projection);
+        scene_shader.setMat4("view",       view);
+        scene_shader.setMat4("model",      modelMat);
+        scene_shader.setMat4("normalMat",  normalMat);
+        scene_shader.setBool("flipuvs",    true);
 
+        switch (g_model) {
+        case 0:
+          church.drawModel(scene_shader.ID);
+          break;
+        case 1:
+	  modelMat  = glm::scale(modelMat, glm::vec3(0.1, 0.1, 0.1));
+          scene_shader.setMat4("model",      modelMat);
+          city.drawModel(scene_shader.ID);
+          break;
+        case 2:
+          suzzane.drawModel(scene_shader.ID);
+          break;
+        }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glDisable(GL_DEPTH_TEST);
 
-        // ===================================================
-        // Normal mode: blit scene directly to screen, skip all feedback
-        // ===================================================
         if (g_stylePreset == 0) {
+            // No effect: blit color directly
             glBindFramebuffer(GL_READ_FRAMEBUFFER, sceneFBO);
+            glReadBuffer(GL_COLOR_ATTACHMENT0);
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-            glBlitFramebuffer(0, 0, fbWidth, fbHeight,
-                              0, 0, fbWidth, fbHeight,
-                              GL_COLOR_BUFFER_BIT, GL_LINEAR);
+            glBlitFramebuffer(0,0,fbWidth,fbHeight, 0,0,fbWidth,fbHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        }
-        else {
-            // ===================================================
-            // Pass B: Copy scene into pingPong[0] as starting point
-            // ===================================================
+        } else {
+            // ===========================================
+            // Pass B: Copy sceneTex -> pingPong[0]
+            // ===========================================
             glBindFramebuffer(GL_READ_FRAMEBUFFER, sceneFBO);
+            glReadBuffer(GL_COLOR_ATTACHMENT0);
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, pingPongFBO[0]);
-            glBlitFramebuffer(0, 0, fbWidth, fbHeight,
-                              0, 0, fbWidth, fbHeight,
-                              GL_COLOR_BUFFER_BIT, GL_LINEAR);
+            glBlitFramebuffer(0,0,fbWidth,fbHeight, 0,0,fbWidth,fbHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-            // ===================================================
-            // Pass C: Recursive feedback — ping-pong N iterations
-            // ===================================================
+            // ===========================================
+            // Pass C: Recursive feedback iterations
+            // ===========================================
             int readIdx = 0;
             for (int i = 0; i < g_numIters; i++) {
                 int writeIdx = 1 - readIdx;
@@ -364,9 +388,19 @@ int main() {
                 glClear(GL_COLOR_BUFFER_BIT);
 
                 feedbackShader.use();
+
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, pingPongTex[readIdx]);
-                feedbackShader.setInt  ("u_prevFrame",     0);
+                feedbackShader.setInt("u_prevFrame", 0);
+
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, depthTex);
+                feedbackShader.setInt("u_depthTex", 1);
+
+                glActiveTexture(GL_TEXTURE2);
+                glBindTexture(GL_TEXTURE_2D, normalTex);
+                feedbackShader.setInt("u_normalTex", 2);
+
                 feedbackShader.setFloat("u_lambda",        g_lambda);
                 feedbackShader.setFloat("u_angle",         glm::radians(g_angle));
                 feedbackShader.setVec2 ("u_texelSize",     glm::vec2(1.0f/fbWidth, 1.0f/fbHeight));
@@ -374,43 +408,43 @@ int main() {
                 feedbackShader.setFloat("u_lumaStrength",  g_lumaStrength);
                 feedbackShader.setFloat("u_quantSteps",    g_quantSteps);
                 feedbackShader.setFloat("u_quantStrength", g_quantStrength);
-                renderQuad();
 
+                feedbackShader.setInt  ("u_useDepth",      g_useDepth ? 1 : 0);
+                feedbackShader.setFloat("u_depthStrength", g_depthStrength);
+                feedbackShader.setInt  ("u_depthMode",     g_depthMode);
+
+                feedbackShader.setInt  ("u_useNormals",    g_useNormals ? 1 : 0);
+                feedbackShader.setFloat("u_normalStrength",g_normalStrength);
+                feedbackShader.setInt  ("u_normalMode",    g_normalMode);
+
+                renderQuad();
                 readIdx = writeIdx;
             }
 
-            // ===================================================
-            // Pass D: Blit final feedback result to screen
-            // ===================================================
+            // ===========================================
+            // Pass D: Blit final result to screen
+            // ===========================================
             glBindFramebuffer(GL_READ_FRAMEBUFFER, pingPongFBO[readIdx]);
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-            glBlitFramebuffer(0, 0, fbWidth, fbHeight,
-                              0, 0, fbWidth, fbHeight,
-                              GL_COLOR_BUFFER_BIT, GL_LINEAR);
+            glBlitFramebuffer(0,0,fbWidth,fbHeight, 0,0,fbWidth,fbHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
 
         glEnable(GL_DEPTH_TEST);
-
-        // --- ImGui on top of everything ---
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    // -------------------------------------------------------
-    // Cleanup
-    // -------------------------------------------------------
     glDeleteFramebuffers(1, &sceneFBO);
-    glDeleteTextures(1,    &sceneTex);
-    glDeleteRenderbuffers(1, &sceneRBO);
+    glDeleteTextures(1, &sceneTex);
+    glDeleteTextures(1, &normalTex);
+    glDeleteTextures(1, &depthTex);
     glDeleteFramebuffers(2, pingPongFBO);
-    glDeleteTextures(2,    pingPongTex);
+    glDeleteTextures(2, pingPongTex);
     glDeleteVertexArrays(1, &quadVAO);
-    glDeleteBuffers(1,     &quadVBO);
-
+    glDeleteBuffers(1, &quadVBO);
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
