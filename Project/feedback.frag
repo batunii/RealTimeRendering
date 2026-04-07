@@ -70,14 +70,22 @@ void main() {
     }
 
     // Normal-driven displacement
-    vec2 normalDisp = vec2(0.0);
-    if (u_useNormals == 1) {
-        // Unpack view-space normal from [0,1] to [-1,1]
-        vec3 N = normalize(texture(u_normalTex, v_uv).rgb * 2.0 - 1.0);
-        // Use XY of view-space normal as stroke direction
-        // This aligns strokes with surface contours in screen space
-        normalDisp = N.xy * u_normalStrength * u_lambda;
-    }
+// FIXED: Use normals to MODULATE color displacement direction, not replace it
+vec2 normalDisp = vec2(0.0);
+if (u_useNormals == 1) {
+    // Step 1: Unpack normal from [0,1] → [-1,1]
+    vec3 N = texture(u_normalTex, v_uv).rgb * 2.0 - 1.0;
+
+    // Step 2: Build a 2D rotation matrix FROM the normal's XY components
+    // This matrix represents "rotate by the surface orientation"
+    mat2 normalRot = mat2(N.x, -N.y,
+                          N.y,  N.x);
+
+    // Step 3: Rotate the existing color displacement toward the surface tangent
+    // base = current color-driven direction (from R and G channels)
+    // 0.012 = tiny scale so recursion stays bounded
+    normalDisp = normalRot * base * u_normalStrength * 0.02;
+}
 
     // Assemble final displacement
     vec2 colorDisp = u_lambda * edgeW * lumaW * depthW * (rot * base);
